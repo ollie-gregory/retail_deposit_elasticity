@@ -1,0 +1,9 @@
+---
+title: 'Elasticity of retail deposits'
+author: Oliver Gregory
+format: pdf
+self-contained: true
+csl: apa.csl
+bibliography: references.bib
+---
+
