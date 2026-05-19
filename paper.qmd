@@ -14,6 +14,8 @@ format:
 self-contained: true
 csl: apa.csl
 bibliography: references.bib
+abstract: |
+    This paper proposes a Vector Error Correction Model (VECM) for estimating the interest rate elasticity of UK retail banking deposits. The model is identified through two cointegrating relationships: a money demand function and a Taylor rule. These form a coherent endogenous system linking aggregate deposits to real GDP, CPI inflation, and the Bank of England base rate. Estimation on quarterly Bank of England data recovers a long-run base rate elasticity of −0.59, with adjustment dynamics suggesting a mean reversion speed of one to two years. Impulse response analysis reveals a hump-shaped short-run response in which deposits initially rise following a rate shock before declining toward their long-run level, reflecting the interplay between short-run product substitution effects and the broader demand-dampening consequences of tighter monetary conditions. The paper further proposes an extension to product-level data, in which macro projections from the aggregate VECM serve as exogenous inputs to product-specific cointegrating regressions, enabling estimation of granular rate elasticities from the spread between product rates and the base rate. The framework has practical applications to deposit modelling, structural hedge sizing, and deposit pricing.
 ---
 
 ```{python}
@@ -47,7 +49,7 @@ Taken together, these applications illustrate that deposit elasticity is not mer
 
 # Theoretical Framework
 
-The empirical model is built around four variables: aggregate retail deposits, real GDP, inflation, and the Bank of England base rate. Each series is individually non stationary, but the central claim of this paper is that they are linked by stable long run equilibrium relationships. The theoretical motivation for this comes from two complementary strands of macroeconomic theory: money demand and monetary policy rules.
+The empirical model is built around four variables: aggregate retail deposits, real GDP, inflation, and the Bank of England base rate. Each series is individually  non-stationary, but the central claim of this paper is that they are linked by stable long run equilibrium relationships. The theoretical motivation for this comes from two complementary strands of macroeconomic theory: money demand and monetary policy rules.
 
 ## Money Demand
 
@@ -65,7 +67,7 @@ $$
 m_t - p_t = \beta_0 + \beta_y y_t + \beta_r r_t
 $$
 
-where lower case letters denote natural logarithms, so $m_t = \log M_t$, $p_t = \log P_t$, and $y_t = \log Y_t$, and $r_t$ is the interest rate entered in levels. The parameter $\beta_1 > 0$ captures the transactions motive: higher real income increases the volume of transactions and therefore the demand for money. The parameter $\beta_2 < 0$ captures the opportunity cost: when interest rates on alternative assets are high, households and firms substitute away from liquid deposits towards those assets, reducing money demand.
+where lower case letters denote natural logarithms, so $m_t = \log M_t$, $p_t = \log P_t$, and $y_t = \log Y_t$, and $r_t$ is the interest rate entered in levels. The parameter $\beta_y > 0$ captures the transactions motive: higher real income increases the volume of transactions and therefore the demand for money. The parameter $\beta_r < 0$ captures the opportunity cost: when interest rates on alternative assets are high, households and firms substitute away from liquid deposits towards those assets, reducing money demand.
 
 In practice, adjustment towards this long run equilibrium is gradual. Households and firms face frictions including transaction costs, institutional constraints, and information delays, meaning that observed money holdings deviate from their equilibrium level in the short run. Empirical models therefore incorporate short run dynamics alongside the long run relationship. @hendry1991 demonstrate that error correction models provide a coherent and empirically stable representation of money demand, in which deviations from long run equilibrium feed back into short run changes in money holdings. In this sense, disequilibrium is not simply noise; it generates predictable adjustments over time, which the VECM is designed to capture.
 
@@ -372,7 +374,7 @@ plt.show()
 
 The positive short run response is at first counterintuitive given the negative coefficient on $r_t$ in the money demand cointegrating vector. The key distinction is between short and long run effects. In the short run, a rise in $r_t$ increases the return on deposit products relative to other assets, attracting inflows from current accounts and cash holdings through a substitution effect that temporarily raises $m_t$. Over a longer horizon, the equilibrating mechanism reflected in $\hat{\beta}_{r}$ reasserts itself: tighter monetary conditions depress economic activity and reduce the transactions demand for money, and the higher opportunity cost of holding deposits relative to capital market instruments draws funds towards those alternatives. The  hump shaped impulse response is therefore consistent with a model in which the short run substitution effect towards deposits dominates initially, before the longer run demand dampening effects of tighter policy take hold.
 
-This pattern has practical implications for balance sheet management. The period over which $m_t$ is elevated following a rate rise, roughly the first six to eight quarters, corresponds broadly to the horizon over which a structural hedge would typically be sized. A risk manager relying solely on the long run elasticity $\hat{\beta}_{r}$ would understate the transitory inflow, while one who observed only the short run response might overestimate its persistence. The impulse response function provides a richer characterisation of deposit dynamics following a rate shock and is directly usable as an input to structural hedge calibration and funds transfer pricing.
+This pattern has practical implications for balance sheet management. The period over which $m_t$ is elevated following a rate rise, roughly the first six to eight quarters, is shorter than the horizon over which a structural hedge would typically be sized. A risk manager relying solely on the short run elasticity might overestimate its persistence, while one who observed only the long run response, $\hat{\beta}_{r}$, might understate the transitory inflow. The impulse response function provides a richer characterisation of deposit dynamics following a rate shock and is directly usable as an input to structural hedge calibration and funds transfer pricing.
 
 # Extension to Product Level Data
 
@@ -388,7 +390,7 @@ $$
 
 The coefficient $\gamma_1^{(j)}$ is a product specific elasticity that captures how sensitive balances in product $j$ are to changes in its pricing relative to the policy rate. Products with large positive $\gamma_1^{(j)}$ are highly rate sensitive, meaning that a compression in the spread relative to the base rate leads to significant outflows. Non-interest bearing current accounts, by contrast, would be expected to exhibit a small or negative $\gamma_1^{(j)}$, since their balances are driven primarily by transactions demand rather than rate competition. Estimating these coefficients across the full product suite therefore provides a ranking of rate sensitivity that can inform both pricing decisions and structural hedge calibration.
 
-The two stage structure allows the framework to be used directly for stress testing. A given macroeconomic scenario, such as a 50 basis point cut to $r_t$, is fed through the first stage VECM to generate forward paths for $r_t$, $y_t$, and $\pi_t$. These paths are then passed into each product level equation alongside an assumed path for $r_t^{(j)}$, which may be determined by a pricing rule or a management decision. The output is a projected balance sheet decomposed by product, which can be aggregated to assess the total funding impact of the scenario.
+The two stage structure allows the framework to be used directly for stress testing. A given macroeconomic scenario, such as a 50 basis point cut to $r_t$, is fed through the first stage VECM to generate forward paths for $r_t$, $y_t$, $\pi_t$ and $m_t$. These paths are then passed into each product level equation alongside an assumed path for $r_t^{(j)}$, which may be determined by a pricing rule or a management decision. The output is a projected balance sheet decomposed by product, which can be aggregated to assess the total funding impact of the scenario.
 
 There are several practical considerations in implementing this framework. First, the current specification uses aggregate retail deposits, but extending to the business banking context would require replacing $m_t$ with aggregate business deposits and re-estimating the first stage accordingly. The cointegrating relationship between $\pi_t$, $r_t$, and $y_t$ in the Taylor rule vector is unaffected by this substitution, since it reflects monetary policy behaviour rather than the composition of the deposit base. Second, the model is currently estimated at quarterly frequency, which limits the ability to capture short run dynamics in variables such as $r_t$ and $\pi_t$ that can move significantly from month to month. Re-estimating on monthly data is a straightforward improvement given that all four series are available at that frequency from the Bank of England, and would increase the precision of the short run adjustment estimates in $\boldsymbol{\alpha}$ without altering the interpretation of the long run cointegrating vectors.
 
@@ -404,6 +406,8 @@ These findings have direct practical relevance for bank balance sheet management
 
 The proposed extension to product level data offers a natural next step. By treating the macro projections from the first stage VECM as exogenous inputs to a set of product level cointegrating regressions, the framework can recover product specific rate elasticities and be used to stress test balance sheets at a granular level. This would allow risk and treasury functions to identify which products drive funding sensitivity under a given scenario, and to assess the balance sheet implications of alternative pricing decisions. Taken together, the aggregate model and its product level extension provide a practical toolkit for deposit modelling that connects macroeconomic dynamics to the day-to-day management of retail and business funding.
 
+\clearpage
+
 # Appendix
 
 ```{python}
@@ -418,5 +422,7 @@ var_labels = {
 
 df_log.describe().apply(lambda x: round(x, 2)).rename(columns=var_labels)
 ```
+
+\clearpage
 
 # References
