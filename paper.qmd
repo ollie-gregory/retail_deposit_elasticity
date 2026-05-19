@@ -11,6 +11,8 @@ format:
         number-sections: true
         fontsize: 11pt
         geometry: margin=2.5cm
+    html:
+        echo: false
 self-contained: true
 csl: apa.csl
 bibliography: references.bib
