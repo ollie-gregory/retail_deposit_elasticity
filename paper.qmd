@@ -1,9 +1,422 @@
 ---
-title: 'Elasticity of retail deposits'
+title: 'Empirical investigation into the elasticity of retail banking deposits with an extension to within bank balance sheets.'
 author: Oliver Gregory
-format: pdf
+date: 2026 May 19
+affiliation: Lloyds Banking Group
+format:
+    pdf:
+        echo: false
+        pdf-engine: xelatex
+        documentclass: article
+        number-sections: true
+        fontsize: 11pt
+        geometry: margin=2.5cm
 self-contained: true
 csl: apa.csl
 bibliography: references.bib
 ---
 
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+import matplotlib.pyplot as plt
+
+plt.rcParams['font.family'] = 'Times New Roman'
+
+from statsmodels.tsa.vector_ar.var_model import VAR
+from statsmodels.tsa.vector_ar.vecm import VECM, coint_johansen
+from statsmodels.tsa.stattools import adfuller
+
+data = pd.read_csv('data/data.csv')
+data['quarter'] = pd.PeriodIndex(data['quarter'], freq='Q')
+data = data.set_index('quarter')
+data = data.dropna()
+```
+
+# Introduction
+
+The stability of retail deposit funding is a first order concern for commercial banks, yet empirical estimates of the interest rate sensitivity of aggregate deposit balances remain sparse in the academic literature. This paper addresses that gap directly. Using a Vector Error Correction Model (VECM) estimated on UK aggregate retail deposit data, we quantify the long run elasticity of deposit balances with respect to real GDP, inflation, and the Bank of England base rate, before proposing an extension to the framework to the bank and product level.
+
+The motivation is threefold. First, and most immediately, the framework provides a strong basis for stress testing bank balance sheets. Regulators and internal risk functions alike require credible forecasts of how deposit volumes respond to macroeconomic shocks and shifts in the interest rate environment. A cointegrated system that explicitly models the long run relationship between deposits and their macroeconomic determinants offers precisely this. Second, understanding the interest rate elasticity of deposits has direct implications for balance sheet management. The structural hedge, a major driver of net interest income for retail banks, is sized against an assumed stock of rate insensitive or slowly repricing liabilities. Misjudging that stock, or its sensitivity to rate changes, carries material consequences for hedging performance and profitability, perhaps even resulting in a 'naked hedge' where there are no deposits backing an interest rate swap. Accurate elasticity estimates allow treasury functions to assess the sensitivity of income to alternative interest rate paths and to allocate capital more efficiently across business lines.
+
+Third, the product level extension proposed in the final section has immediate operational relevance. Aggregate deposit elasticities mask considerable heterogeneity across product types: non interest bearing current accounts, fixed term deposits, and day notice accounts respond to rate changes through distinct mechanisms and on different timescales. By applying the same VECM framework to granular balance sheet data, we can determine how individual product elasticities can be recovered and used to inform pricing decisions, product design, and the calibration of funds transfer pricing curves.
+
+Taken together, these applications illustrate that deposit elasticity is not merely an academic quantity. It sits at the intersection of monetary economics and bank management, with consequences that run from the design of the structural hedge to the day to day pricing of savings products.
+
+# Theoretical Framework
+
+The empirical model is built around four variables: aggregate retail deposits, real GDP, inflation, and the Bank of England base rate. Each series is individually non stationary, but the central claim of this paper is that they are linked by stable long run equilibrium relationships. The theoretical motivation for this comes from two complementary strands of macroeconomic theory: money demand and monetary policy rules.
+
+## Money Demand
+
+The demand for money reflects a trade off between the convenience of holding liquid assets and the opportunity cost of doing so, since holding money forgoes the return available from illiquid alternatives. @tobin1956 formalises this into a theory of liquidity preference, implying a long run relationship of the form:
+
+$$
+\frac{M_t}{P_t} = \Phi(Y_t, R_t)
+$$
+
+where $M_t$ is the nominal stock of money, $P_t$ is the price level, $Y_t$ is real income, and $R_t$ is the nominal interest rate on alternative assets. The left hand side is real money balances, and the function $\Phi$ captures how demand for these balances varies with economic activity and the cost of holding money rather than investing it.
+
+Assuming log-linearity, this can be rewritten as:
+
+$$
+m_t - p_t = \beta_0 + \beta_y y_t + \beta_r r_t
+$$
+
+where lower case letters denote natural logarithms, so $m_t = \log M_t$, $p_t = \log P_t$, and $y_t = \log Y_t$, and $r_t$ is the interest rate entered in levels. The parameter $\beta_1 > 0$ captures the transactions motive: higher real income increases the volume of transactions and therefore the demand for money. The parameter $\beta_2 < 0$ captures the opportunity cost: when interest rates on alternative assets are high, households and firms substitute away from liquid deposits towards those assets, reducing money demand.
+
+In practice, adjustment towards this long run equilibrium is gradual. Households and firms face frictions including transaction costs, institutional constraints, and information delays, meaning that observed money holdings deviate from their equilibrium level in the short run. Empirical models therefore incorporate short run dynamics alongside the long run relationship. @hendry1991 demonstrate that error correction models provide a coherent and empirically stable representation of money demand, in which deviations from long run equilibrium feed back into short run changes in money holdings. In this sense, disequilibrium is not simply noise; it generates predictable adjustments over time, which the VECM is designed to capture.
+
+## Monetary Policy
+
+Rather than treating the interest rate as exogenous, this paper models it as the outcome of systematic monetary policy behaviour. @taylor1993 shows that central banks adjust the short term interest rate in response to both inflation and the level of economic activity, giving rise to the Taylor rule:
+
+$$
+r_t = r^* + \pi_t + \alpha(\pi_t - \pi^*) + \beta(y_t - y^*)
+$$
+
+where $r_t$ is the nominal policy rate, $r^*$ is the equilibrium real interest rate, $\pi_t$ is current inflation, $\pi^*$ is the inflation target, $y_t$ is log real output, and $y^*$ is log potential output. The term $\alpha(\pi_t - \pi^*)$ reflects the central bank's response to deviations of inflation from target, and $\beta(y_t - y^*)$ reflects its response to the output gap. The rule implies that monetary policy tightens when inflation is above target or the economy is operating above potential, and loosens in the opposite case.
+
+@clarida1998 extend this framework to a forward looking setting, in which central banks respond to expected future inflation and output rather than current values. This introduces additional persistence into the policy rate through gradual adjustment, which is consistent with the smoothing behaviour observed in practice at the Bank of England.
+
+## The Case for a Joint System
+
+These two frameworks together imply that retail deposits, real GDP, inflation, and the Bank of England base rate form an endogenous system. Deposits depend on interest rates through the opportunity cost channel in the money demand equation, and interest rates depend on output and inflation through the Taylor rule. Estimating these relationships jointly is therefore important for identification.
+
+Omitting any of the three conditioning variables creates specific problems. Excluding inflation removes the primary driver of monetary policy tightening, conflating rate changes that reflect inflationary pressure with those driven by real activity. Excluding real GDP makes it impossible to distinguish between demand driven deposit growth, in which rising incomes increase the transactions demand for money, and rate driven substitution effects, in which higher returns on deposits attract funds from other assets. Excluding the base rate removes the central mechanism through which macroeconomic conditions feed into deposit pricing, leaving the money demand relationship under identified.
+
+The VECM used in this paper is designed to address all three of these concerns simultaneously, by estimating the long run equilibrium relationships and short run dynamics across all four variables within a single coherent system.
+
+# Data and Empirical Strategy
+
+## Data
+
+All data are sourced from the Bank of England and are observed at quarterly frequency. The four variables entering the model are the Bank of England base rate, real GDP, the CPI inflation rate, and aggregate retail deposits. The sample spans from [START DATE] to [END DATE], covering three broadly distinct interest rate regimes: a period of relatively elevated rates prior to the 2008 financial crisis, a prolonged near-zero rate environment lasting until 2022, and a rapid tightening cycle thereafter. That the model is estimated across all three regimes jointly is worth noting as a caveat: if the relationship between deposits and their determinants differs across regimes, a single set of cointegrating vectors may not capture this heterogeneity. We return to this point in the discussion of results.
+
+Prior to estimation, two transformations are applied. Real GDP and aggregate retail deposits are expressed in natural logarithms, so that coefficients can be interpreted as elasticities. The base rate and CPI inflation rate are left in levels, which is standard practice given that rates are already expressed in percentage point units and log-transforming near-zero values is problematic. All four variables are then standardised by subtracting their sample mean and dividing by their sample standard deviation, which facilitates comparison of coefficient magnitudes across variables with very different scales.
+
+@fig-timeseries plots all four variables after transformation. Several features of the data are worth noting. The base rate exhibits a sharp decline following the 2008 crisis and remains near zero for over a decade before rising steeply from 2022 onwards. Real GDP follows a broadly upward trend, interrupted by two large contractions: one around the 2008 financial crisis and one associated with the Covid-19 pandemic. The recovery following the pandemic shock was faster than that following 2008, though subsequent growth has been slower. CPI inflation is relatively stable for much of the sample, with modest spikes in 2008, 2011, and 2017, before a large and persistent surge beginning in 2022. Aggregate retail deposits are relatively stable prior to 2008 but show considerably more volatility thereafter, with notable troughs around 2011, 2016, 2018, and 2023, though the severity of these episodes varies.
+
+```{python}
+#| label: fig-timeseries
+#| fig-pos: H
+#| fig-cap: "Macroeconomic variable timeseries used in analysis."
+df_log = data.copy()
+
+df_log['real_GDP'] = np.log(df_log['real_GDP'])
+df_log['cpi_rate'] = df_log['cpi_rate'].replace(0, 1e-6)
+df_log['agg_deposits'] = np.log(df_log['agg_deposits'])
+df_log['base_rate'] = df_log['base_rate']
+
+var_labels = {
+    'real_GDP': 'Log Real GDP',
+    'cpi_rate': 'CPI rate',
+    'agg_deposits': 'Log UK Aggregate Retail Deposits',
+    'base_rate': 'Bank of England Base Rate'
+}
+
+fig, axes = plt.subplots(2, 2, figsize=(8, 5))
+
+axes = axes.flatten()
+
+x = df_log.index.to_timestamp()
+
+for i, col in enumerate(['real_GDP', 'cpi_rate', 'base_rate', 'agg_deposits']):
+
+    axes[i].plot(x, df_log[col], color='#11B67A', linewidth=2)
+    axes[i].set_title(var_labels[col])
+    axes[i].grid()
+
+plt.tight_layout()
+plt.show()
+```
+
+## Non-Stationarity
+
+The theoretical framework in the previous section motivates a cointegrated system, but this requires that the individual variables are themselves non-stationary. We test this formally using Augmented Dickey-Fuller (ADF) tests, in which the null hypothesis is that the series contains a unit root. @tbl-adf reports the p-values for each variable. In all four cases, we fail to reject the null at conventional significance levels, consistent with each variable being integrated of order one, $I(1)$. This is unsurprising given the strong persistence visible in @fig-timeseries, but it is a necessary pre-condition for the cointegration analysis that follows.
+
+```{python}
+#| label: tbl-adf
+#| tbl-cap: "ADF test results."
+df = (df_log - df_log.mean()) / df_log.std()
+df = df[['base_rate', 'real_GDP', 'cpi_rate', 'agg_deposits']].dropna()
+
+adf_results = []
+
+for col in df.columns:
+    result = adfuller(df[col])
+
+    adf_results.append({
+        'Variable': var_labels[col],
+        'ADF Statistic': result[0],
+        'p-value': result[1],
+    })
+
+# convert to dataframe
+adf_df = pd.DataFrame(adf_results)
+
+# optional formatting
+adf_df['ADF Statistic'] = adf_df['ADF Statistic'].round(3)
+adf_df['p-value'] = adf_df['p-value'].round(3)
+
+adf_df.set_index('Variable')
+```
+
+## Cointegration and the VECM
+
+The presence of unit roots in each variable raises the question of whether they share a stable long run relationship. If a linear combination of the variables is stationary, the system is said to be cointegrated, and a Vector Error Correction Model (VECM) is the appropriate framework for estimation. @johansen1990 provide a general procedure for testing cointegration within a VAR system and determining the number of cointegrating relationships.
+
+The starting point is a VAR of order $p$ in the vector $\mathbf{z}_t = (m_t, y_t, \pi_t, r_t)'$, where $m_t$ is log real deposits, $y_t$ is log real GDP, $\pi_t$ is the CPI inflation rate, and $r_t$ is the Bank of England base rate. This can be reparameterised as a VECM:
+
+$$
+\Delta \mathbf{z}_t = \boldsymbol{\alpha} \boldsymbol{\beta}' \mathbf{z}_{t-1} +
+\sum_{i=1}^{p-1} \boldsymbol{\Gamma}_i \Delta \mathbf{z}_{t-i} + \boldsymbol{\varepsilon}_t
+$$
+
+The matrix $\boldsymbol{\beta}$ contains the cointegrating vectors, each of which defines a long run equilibrium relationship between the variables. The matrix $\boldsymbol{\alpha}$ contains the adjustment coefficients, governing how quickly each variable responds to deviations from those equilibria. The rank of the product $\boldsymbol{\alpha}\boldsymbol{\beta}'$, denoted $r$, equals the number of cointegrating relationships. If $r = 0$ there is no long-run relationship and a VAR in first differences is appropriate. If $r = k$ (the full rank) the variables are stationary and a levels VAR is appropriate. The interesting case is $0 < r < k$, in which the system is cointegrated.
+
+The number of cointegrating vectors is determined using the Johansen trace test, which tests the null hypothesis that the cointegrating rank is at most $r$ against the alternative that it is greater. We estimate the model with a constant restricted to the cointegrating space, following the convention for variables that trend in levels but whose cointegrating relationships do not exhibit a deterministic trend.
+
+```{python}
+#| label: tbl-johansen
+#| tbl-cap: "Johansen Cointegration Test Results."
+#| tbl-width: 0.6
+
+p=2
+result = coint_johansen(df, det_order=1, k_ar_diff=p-1)
+
+# build results table
+johansen_df = pd.DataFrame({
+    'Rank': [f'r < {i+1}' for i in range(len(result.lr1))],
+    'Trace Statistic': result.lr1,
+    '95% Critical Value': result.cvt[:, 1]   # 95% column only
+})
+
+# optional formatting
+johansen_df['Trace Statistic'] = johansen_df['Trace Statistic'].round(3)
+johansen_df['95% Critical Value'] = johansen_df['95% Critical Value'].round(3)
+
+# optional rejection decision
+johansen_df['Reject H0 (5%)'] = (
+    johansen_df['Trace Statistic'] >
+    johansen_df['95% Critical Value']
+)
+
+johansen_df = johansen_df[johansen_df['Rank'].isin(['r < 1', 'r < 2', 'r < 3'])]
+
+johansen_df.set_index('Rank')
+```
+
+@tbl-johansen reports the trace statistics and their 5% critical values. The results indicate $r = 2$: the null of $r < 2$ is rejected, but the null of $r < 3$ is not. We therefore proceed with two cointegrating vectors, which is broadly consistent with the theoretical motivation: one relationship reflecting money demand, linking deposits to real GDP and the interest rate, and one reflecting the Taylor rule, linking the policy rate to inflation and output.
+
+The lag length $p = 2$ is selected using a combination of the Akaike Information Criterion (AIC) and the Bayesian Information Criterion (BIC) applied to the unrestricted VAR in levels prior to reparameterisation. A two period lag is well motivated on economic grounds: two quarters allows for a plausible monetary policy transmission horizon without over parameterising the model, which is a particular concern given the moderate sample size.
+
+# Results
+
+## Cointegrating Relationships
+
+The normalised cointegrating vectors are reported in @tbl-beta. Two long run relationships are identified, interpreted as a money demand equation and a Taylor rule respectively, consistent with the theoretical motivation in Section 2.
+
+```{python}
+#| label: tbl-beta
+#| tbl-cap: "Normalised Cointegration Coefficients (beta)."
+r = 2
+p = 2
+vecm = VECM(df, k_ar_diff=p-1, coint_rank=r, deterministic='co')
+vecm_fit = vecm.fit()
+
+var_labels = {
+    'real_GDP': 'Real GDP',
+    'cpi_rate': 'CPI rate',
+    'agg_deposits': 'Aggregate Deposits',
+    'base_rate': 'Bank Rate'
+}
+
+cv_labels = {
+    'CV1': 'Money Demand',
+    'CV2': 'Taylor Rule'
+}
+
+def add_stars(val, p_val):
+    if p_val < 0.001:
+        stars = "***"
+    elif p_val < 0.01:
+        stars = "**"
+    elif p_val < 0.05:
+        stars = "*"
+    else:
+        stars = ""
+    return f"{val:.4f}{stars}"
+
+beta = pd.DataFrame(
+    vecm_fit.beta, index=df.columns, columns=[f"CV{i+1}" for i in range(r)]
+)
+p_beta = pd.DataFrame(
+    vecm_fit.pvalues_beta,
+    index=df.columns,
+    columns=[f"CV{i+1}" for i in range(r)],
+)
+
+beta_norm = beta / beta.loc["agg_deposits"]
+
+beta_starred = pd.DataFrame(
+    [[add_stars(beta_norm.iat[i, j], p_beta.iat[i, j]) for j in range(beta_norm.shape[1])]
+     for i in range(beta_norm.shape[0])],
+    index=beta_norm.index,
+    columns=beta_norm.columns,
+)
+beta_starred.loc["agg_deposits"] = "1.0000"
+beta_starred = beta_starred.rename(index=var_labels, columns=cv_labels)
+beta_starred.loc['Bank Rate', 'Taylor Rule'] = '-'
+beta_starred.loc['Real GDP', 'Money Demand'] = '-'
+beta_starred
+```
+
+The first cointegrating vector can be written as the estimated money demand relationship:
+
+$$
+m_t = 1.02\, \pi_t - 0.59\, r_t + \mu_1
+$$
+
+where $\mu_1$ is a constant absorbed into the cointegrating space. The coefficient on $r_t$ is significant at the 1% level, indicating that a one percentage point increase in the base rate is associated with a 0.59 standard deviation decline in real deposit balances in the long run. This is consistent with the opportunity cost channel described in Section 2: higher rates on alternative assets induce substitution away from deposits. The coefficient on $\pi_t$ is 1.02, also significant at the 1% level. This reflects the standard Fisher effect: higher inflation erodes real balances, inducing households to hold nominally larger deposit stocks to maintain real purchasing power. It is notable that the coefficients on both $\pi_t$ and $r_t$ are close to unity in absolute value, which is broadly consistent with the theoretical long run money demand relationship of @tobin1956.
+
+The second cointegrating vector can be written as an estimated Taylor rule:
+
+$$
+r_t = 1.02\, y_t - 2.71\, \pi_t + \mu_2
+$$
+
+where again $\mu_2$ is a constant restricted to the cointegrating space. The coefficient on $y_t$ is 1.02, significant at the 1% level, consistent with a central bank that tightens policy when economic activity rises above potential. The coefficient on $\pi_t$ is $-2.71$, significant at the 1% level. The negative sign here reflects the normalisation of the cointegrating vector on $m_t$ rather than on $r_t$ directly: re-expressing the vector with $r_t$ normalised to unity implies an inflation response coefficient of approximately 2.71, which is consistent with the Taylor principle as formalised in @taylor1993. This states that the nominal policy rate should rise by more than one-for-one with inflation, preserving a positive real rate response. The estimated coefficient exceeds the value of 1.5 proposed by @taylor1993, though this is not unusual for estimates covering a period that includes the aggressive tightening cycle of 2022 to 2023.
+
+## Adjustment Dynamics
+
+The adjustment coefficients $\boldsymbol{\alpha}$ reported in @tbl-alpha indicate which variables respond to disequilibrium in each cointegrating relationship and at what speed. The most precisely estimated coefficient is on aggregate deposits in the money demand equation, $\hat{\alpha}_{m,1} = 0.12$, significant at the 1% level. This implies that when $m_t$ is below its long run equilibrium, given the prevailing levels of $r_t$, $y_t$, and $\pi_t$, deposit balances increase by approximately 0.12 standard deviations per quarter towards equilibrium. This is a moderately slow adjustment speed, suggesting that the full deposit response to a macroeconomic shock plays out over several quarters.
+
+```{python}
+#| label: tbl-alpha
+#| tbl-cap: "Adjustment Coefficients (alpha)."
+alpha = pd.DataFrame(
+    vecm_fit.alpha, index=df.columns, columns=[f"CV{i+1}" for i in range(r)]
+)
+p_alpha = pd.DataFrame(
+    vecm_fit.pvalues_alpha,
+    index=df.columns,
+    columns=[f"CV{i+1}" for i in range(r)],
+)
+
+alpha_starred = pd.DataFrame(
+    [[add_stars(alpha.iat[i, j], p_alpha.iat[i, j]) for j in range(alpha.shape[1])]
+     for i in range(alpha.shape[0])],
+    index=alpha.index,
+    columns=alpha.columns,
+)
+alpha_starred = alpha_starred.rename(index=var_labels, columns=cv_labels)
+alpha_starred
+```
+
+The remaining adjustment coefficients are either small or statistically insignificant, with the exception of the CPI rate loading on the Taylor rule vector ($\hat{\alpha}_{\pi,2} = 0.05$, significant at the 1% level). The absence of significant adjustment in the $r_t$ and $y_t$ equations is broadly expected: output and monetary policy respond to a wide range of variables beyond deposit disequilibrium. The weak loading of $r_t$ also provides some support for treating the base rate as weakly exogenous with respect to the money demand cointegrating vector, which is consistent with single-equation approaches to deposit modelling in the literature.
+
+## Impulse Response Analysis
+
+@fig-irf plots the impulse response of $m_t$ to a one percentage point shock to $r_t$, estimated on the unnormalised data with bootstrap confidence bands. The response is positive throughout the horizon, peaking at approximately 0.18 after five to six quarters before declining gradually towards a long run level of around 0.12. The confidence band, while wide, excludes zero for the whole of the horizon shown, indicating that the effect is statistically distinguishable from no response.
+
+```{python}
+#| label: fig-irf
+#| fig-cap: "Impulse response function of Bank Rate shock on aggregate deposit balances."
+
+r = 2
+p = 2
+df_log = df_log[['base_rate', 'real_GDP', 'cpi_rate', 'agg_deposits']].dropna()
+vecm = VECM(df_log, k_ar_diff=p-1, coint_rank=r, deterministic='co')
+vecm_fit = vecm.fit()
+
+irf = vecm_fit.irf(20)
+
+impulse_idx = 0  # base_rate
+response_idx = 3  # agg_deposits
+
+# Point estimate and standard errors
+irf_vals = irf.irfs[:, response_idx, impulse_idx]
+stderr_vals = irf.stderr()[:, response_idx, impulse_idx]
+
+sigma_base_rate = df_log['base_rate'].std()
+
+irf_rescaled_1pp = irf_vals * (1 / sigma_base_rate)
+stderr_rescaled_1pp = stderr_vals * (1 / sigma_base_rate)
+
+irf_vals = irf_rescaled_1pp
+stderr_vals = stderr_rescaled_1pp
+
+lower = irf_vals - 1.96 * stderr_vals
+upper = irf_vals + 1.96 * stderr_vals
+periods = range(len(irf_vals))
+
+fig, ax = plt.subplots(figsize=(4, 2.5))
+
+ax.plot(periods, irf_vals, color='#024731', lw=2, label='IRF')
+ax.fill_between(periods, lower, upper, alpha=0.5, color='#11B67A', label='95% CI')
+ax.axhline(0, color='black', lw=0.5, ls='-')
+
+ax.set_xlabel('Periods', fontsize=9)
+ax.set_ylabel('Response', fontsize=9)
+ax.tick_params(labelsize=8)
+ax.grid(axis='y')
+ax.set_xlim(0, 20)
+ax.set_title('Bank Rate → Aggregate Deposits')
+
+plt.tight_layout()
+plt.show()
+```
+
+The positive short run response is at first counterintuitive given the negative coefficient on $r_t$ in the money demand cointegrating vector. The key distinction is between short and long run effects. In the short run, a rise in $r_t$ increases the return on deposit products relative to other assets, attracting inflows from current accounts and cash holdings through a substitution effect that temporarily raises $m_t$. Over a longer horizon, the equilibrating mechanism reflected in $\hat{\beta}_{r}$ reasserts itself: tighter monetary conditions depress economic activity and reduce the transactions demand for money, and the higher opportunity cost of holding deposits relative to capital market instruments draws funds towards those alternatives. The hump-shaped impulse response is therefore consistent with a model in which the short run substitution effect towards deposits dominates initially, before the longer run demand-dampening effects of tighter policy take hold.
+
+This pattern has practical implications for balance sheet management. The period over which $m_t$ is elevated following a rate rise, roughly the first six to eight quarters, corresponds broadly to the horizon over which a structural hedge would typically be sized. A risk manager relying solely on the long run elasticity $\hat{\beta}_{r}$ would understate the transitory inflow, while one who observed only the short run response might overestimate its persistence. The impulse response function provides a richer characterisation of deposit dynamics following a rate shock and is directly usable as an input to structural hedge calibration and funds transfer pricing.
+
+# Extension to Product Level Data
+
+The aggregate framework estimated in this paper can be extended to the product level in a natural two stage approach that preserves the cointegrating structure while introducing product specific pricing dynamics.
+
+The first stage is the VECM estimated above. Given a macroeconomic shock, for example a 25 basis point increase in $r_t$, the system generates a projected path for all four variables over the desired horizon. These projected paths serve as inputs to the second stage rather than being used directly for product level inference, since the aggregate relationship between $m_t$ and $r_t$ masks considerable heterogeneity across product types.
+
+The second stage estimates a separate cointegrating relationship for each product, linking product level deposit balances $m_t^{(j)}$ to the spread between the product's own interest rate $r_t^{(j)}$ and the Bank of England base rate $r_t$, with the macro variables from the first stage entering as exogenous conditioning variables:
+
+$$
+m_t^{(j)} = \gamma_0^{(j)} + \gamma_1^{(j)} \left( r_t^{(j)} - r_t \right) + \gamma_2^{(j)} y_t + \gamma_3^{(j)} \pi_t + \varepsilon_t^{(j)}
+$$
+
+The coefficient $\gamma_1^{(j)}$ is a product specific elasticity that captures how sensitive balances in product $j$ are to changes in its pricing relative to the policy rate. Products with large positive $\gamma_1^{(j)}$ are highly rate sensitive, meaning that a compression in the spread relative to the base rate leads to significant outflows. Non-interest bearing current accounts, by contrast, would be expected to exhibit a small or negative $\gamma_1^{(j)}$, since their balances are driven primarily by transactions demand rather than rate competition. Estimating these coefficients across the full product suite therefore provides a ranking of rate sensitivity that can inform both pricing decisions and structural hedge calibration.
+
+The two stage structure allows the framework to be used directly for stress testing. A given macroeconomic scenario, such as a 50 basis point cut to $r_t$, is fed through the first stage VECM to generate forward paths for $r_t$, $y_t$, and $\pi_t$. These paths are then passed into each product level equation alongside an assumed path for $r_t^{(j)}$, which may be determined by a pricing rule or a management decision. The output is a projected balance sheet decomposed by product, which can be aggregated to assess the total funding impact of the scenario.
+
+There are several practical considerations in implementing this framework. First, the current specification uses aggregate retail deposits, but extending to the business banking context would require replacing $m_t$ with aggregate business deposits and re-estimating the first stage accordingly. The cointegrating relationship between $\pi_t$, $r_t$, and $y_t$ in the Taylor rule vector is unaffected by this substitution, since it reflects monetary policy behaviour rather than the composition of the deposit base. Second, the model is currently estimated at quarterly frequency, which limits the ability to capture short run dynamics in variables such as $r_t$ and $\pi_t$ that can move significantly from month to month. Re-estimating on monthly data is a straightforward improvement given that all four series are available at that frequency from the Bank of England, and would increase the precision of the short run adjustment estimates in $\boldsymbol{\alpha}$ without altering the interpretation of the long run cointegrating vectors.
+
+# Conclusion
+
+This paper has estimated a Vector Error Correction Model for UK aggregate retail deposits using quarterly data from the Bank of England. The results identify two cointegrating relationships, interpreted as a long run money demand equation and a Taylor rule, linking aggregate deposits to real GDP, CPI inflation, and the Bank of England base rate within a single coherent system.
+
+The estimated money demand relationship implies a long run base rate elasticity of $-0.59$, consistent with the opportunity cost channel in which higher policy rates induce substitution away from deposits towards alternative assets. The adjustment coefficient on deposits, $\hat{\alpha}_{m,1} = 0.12$, indicates a moderately slow mean reversion speed of roughly one to two years, suggesting that deposit balances respond gradually to macroeconomic shocks rather than adjusting immediately.
+
+The impulse response analysis reinforces this picture. A one percentage point shock to the base rate generates a positive short run response in deposit balances, peaking at approximately 0.18 after five to six quarters before declining towards a long run level of around 0.12. This hump-shaped response reflects the tension between a short run substitution effect, in which higher rates attract inflows to deposit products, and the longer run demand-dampening effects of tighter monetary conditions working through reduced output and transactions demand.
+
+These findings have direct practical relevance for bank balance sheet management. The structural hedge is sized against an assumed stock of rate-insensitive or slowly-repricing liabilities, and the impulse response estimated here provides an empirical basis for that assumption. A bank that sized its hedge using only the long run elasticity would understate the transitory deposit inflow following a rate rise, while one relying on the short run response alone would overestimate its persistence. The VECM framework, by capturing both the long run equilibrium and the short run dynamics jointly, provides a more complete characterisation of deposit behaviour than either a static regression or a reduced form time series model could offer.
+
+The proposed extension to product level data offers a natural next step. By treating the macro projections from the first stage VECM as exogenous inputs to a set of product level cointegrating regressions, the framework can recover product specific rate elasticities and be used to stress test balance sheets at a granular level. This would allow risk and treasury functions to identify which products drive funding sensitivity under a given scenario, and to assess the balance sheet implications of alternative pricing decisions. Taken together, the aggregate model and its product level extension provide a practical toolkit for deposit modelling that connects macroeconomic dynamics to the day-to-day management of retail and business funding.
+
+# Appendix
+
+```{python}
+#| label: tbl-summary-stats
+#| tbl-cap: "Summary statistics for transformed variables."
+var_labels = {
+    'real_GDP': 'Log Real GDP',
+    'cpi_rate': 'CPI rate',
+    'agg_deposits': 'Log Aggregate Deposits',
+    'base_rate': 'Bank Rate'
+}
+
+df_log.describe().apply(lambda x: round(x, 2)).rename(columns=var_labels)
+```
+
+# References
